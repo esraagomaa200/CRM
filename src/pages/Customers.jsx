@@ -97,6 +97,7 @@ const SEGMENTS = {
   new: "New",
   "at-risk": "At Risk",
 };
+
 const TABS = ["all", "vip", "new", "regular", "at-risk"];
 const PAGE_SIZE = 6;
 
@@ -107,11 +108,19 @@ const BADGE_CLASSES = {
   "at-risk": "bg-risk-bg text-risk-text",
 };
 
-const EMPTY_FORM = { name: "", email: "", segment: "new", location: "" };
+const EMPTY_FORM = {
+  name: "",
+  email: "",
+  segment: "new",
+  location: "",
+};
 
 function getInitials(name) {
-  const [first, last] = name.split(" ");
-  return `${first?.[0] || ""}${last?.[0] || ""}`;
+  const parts = name.trim().split(" ");
+  const first = parts[0] || "";
+  const last = parts[parts.length - 1] || "";
+
+  return `${first[0] || ""}${last[0] || ""}`;
 }
 
 function todayLabel() {
@@ -175,6 +184,7 @@ export default function Customers() {
   const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+
   const [showAddModal, setShowAddModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
@@ -187,32 +197,43 @@ export default function Customers() {
       regular: 0,
       "at-risk": 0,
     };
-    customers.forEach((c) => {
-      base[c.segment] += 1;
+
+    customers.forEach((customer) => {
+      if (base[customer.segment] !== undefined) {
+        base[customer.segment] += 1;
+      }
     });
+
     return base;
   }, [customers]);
 
   const filtered = useMemo(() => {
-    return customers.filter((c) => {
-      const matchesTab = tab === "all" || c.segment === tab;
-      const q = search.trim().toLowerCase();
+    const query = search.trim().toLowerCase();
+
+    return customers.filter((customer) => {
+      const matchesTab = tab === "all" || customer.segment === tab;
+
       const matchesSearch =
-        !q ||
-        c.name.toLowerCase().includes(q) ||
-        c.email.toLowerCase().includes(q);
+        !query ||
+        customer.name.toLowerCase().includes(query) ||
+        customer.email.toLowerCase().includes(query);
+
       return matchesTab && matchesSearch;
     });
   }, [customers, tab, search]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+
   const currentPage = Math.min(page, totalPages);
+
   const paged = filtered.slice(
     (currentPage - 1) * PAGE_SIZE,
     currentPage * PAGE_SIZE,
   );
+
   const rangeStart =
     filtered.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+
   const rangeEnd = Math.min(currentPage * PAGE_SIZE, filtered.length);
 
   function handleTabChange(nextTab) {
@@ -233,14 +254,21 @@ export default function Customers() {
 
   function closeAddModal() {
     setShowAddModal(false);
+    setFormError("");
   }
 
   function handleFormChange(field, value) {
-    setForm((f) => ({ ...f, [field]: value }));
+    setForm((currentForm) => ({
+      ...currentForm,
+      [field]: value,
+    }));
+
+    setFormError("");
   }
 
-  function handleAddCustomer(e) {
-    e.preventDefault();
+  function handleAddCustomer(event) {
+    event.preventDefault();
+
     const name = form.name.trim();
     const email = form.email.trim();
     const location = form.location.trim();
@@ -251,8 +279,9 @@ export default function Customers() {
     }
 
     const nextId = customers.length
-      ? Math.max(...customers.map((c) => c.id)) + 1
+      ? Math.max(...customers.map((customer) => customer.id)) + 1
       : 1;
+
     const newCustomer = {
       id: nextId,
       name,
@@ -265,30 +294,44 @@ export default function Customers() {
       joined: todayLabel(),
     };
 
-    setCustomers((prev) => [newCustomer, ...prev]);
+    setCustomers((currentCustomers) => [newCustomer, ...currentCustomers]);
+
     setShowAddModal(false);
+    setForm(EMPTY_FORM);
+    setFormError("");
     setTab("all");
+    setSearch("");
     setPage(1);
   }
 
   function handleDeleteCustomer(id) {
-    if (!window.confirm("Remove this customer?")) return;
-    setCustomers((prev) => prev.filter((c) => c.id !== id));
+    const confirmed = window.confirm("Remove this customer?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setCustomers((currentCustomers) =>
+      currentCustomers.filter((customer) => customer.id !== id),
+    );
   }
 
   return (
     <div>
+      {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl md:text-[28px] font-bold text-gray-900 mb-1">
             Customers
           </h1>
+
           <p className="text-sm text-gray-500">
             {customers.length} total customers
           </p>
         </div>
 
         <button
+          type="button"
           onClick={openAddModal}
           className="flex items-center gap-2 bg-brand text-white rounded-[10px] px-4 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity shrink-0"
         >
@@ -297,9 +340,11 @@ export default function Customers() {
         </button>
       </div>
 
+      {/* Tabs */}
       <div className="inline-flex items-center gap-1 bg-white border border-gray-200 rounded-[10px] p-1.5 my-6 overflow-x-auto max-w-full">
         {TABS.map((key) => (
           <button
+            type="button"
             key={key}
             onClick={() => handleTabChange(key)}
             className={`flex items-center gap-2 rounded-[10px] px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${
@@ -309,6 +354,7 @@ export default function Customers() {
             }`}
           >
             {key === "all" ? "All" : SEGMENTS[key]}
+
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
                 tab === key
@@ -321,21 +367,24 @@ export default function Customers() {
           </button>
         ))}
       </div>
+
+      {/* Search */}
       <div className="bg-white border border-gray-200 rounded-[14px] p-3 w-full shadow-sm mb-5">
         <div className="flex items-center gap-2.5 bg-gray-50 border border-gray-200 rounded-[10px] px-4 py-3 w-full max-w-[480px] text-gray-400">
           <IconSearch />
+
           <input
             type="text"
             placeholder="Search by name or email..."
             value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
+            onChange={(event) => handleSearchChange(event.target.value)}
             className="border-none outline-none bg-transparent text-sm w-full text-gray-900 min-w-0"
           />
         </div>
       </div>
 
+      {/* Table */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden max-w-full">
-        {/* Table */}
         <div className="overflow-x-auto">
           <table className="border-collapse min-w-[900px] w-full">
             <thead className="bg-gray-50">
@@ -349,76 +398,99 @@ export default function Customers() {
                   "Last Order",
                   "Joined",
                   "",
-                ].map((h) => (
+                ].map((header, index) => (
                   <th
-                    key={h}
+                    key={`${header}-${index}`}
                     className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 px-5 py-3.5 border-b border-gray-200 whitespace-nowrap"
                   >
-                    {h}
+                    {header}
                   </th>
                 ))}
               </tr>
             </thead>
 
             <tbody>
-              {paged.map((c) => (
+              {paged.map((customer) => (
                 <tr
-                  key={c.id}
+                  key={customer.id}
                   className="bg-white hover:bg-gray-50 transition-colors"
                 >
+                  {/* Customer */}
                   <td className="px-5 py-4 border-b border-gray-200 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <span
-                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-[13px] shrink-0 ${BADGE_CLASSES[c.segment]}`}
+                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-[13px] shrink-0 ${
+                          BADGE_CLASSES[customer.segment]
+                        }`}
                       >
-                        {getInitials(c.name)}
+                        {getInitials(customer.name)}
                       </span>
 
-                      <span className="font-semibold text-sm text-gray-900">
-                        {c.name}
-                      </span>
+                      <div>
+                        <span className="font-semibold text-sm text-gray-900 block">
+                          {customer.name}
+                        </span>
+
+                        <span className="text-xs text-gray-500">
+                          {customer.email}
+                        </span>
+                      </div>
                     </div>
                   </td>
 
+                  {/* Segment */}
                   <td className="px-5 py-4 border-b border-gray-200 whitespace-nowrap">
                     <span
-                      className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${BADGE_CLASSES[c.segment]}`}
+                      className={`inline-block rounded-full px-3 py-1 text-xs font-semibold ${
+                        BADGE_CLASSES[customer.segment]
+                      }`}
                     >
-                      {SEGMENTS[c.segment]}
+                      {SEGMENTS[customer.segment]}
                     </span>
                   </td>
 
+                  {/* Location */}
                   <td className="px-5 py-4 border-b border-gray-200 text-sm text-gray-900 whitespace-nowrap">
-                    {c.location}
+                    {customer.location}
                   </td>
 
+                  {/* Orders */}
                   <td className="px-5 py-4 border-b border-gray-200 text-sm text-gray-900 whitespace-nowrap">
-                    {c.orders}
+                    {customer.orders}
                   </td>
 
+                  {/* LTV */}
                   <td className="px-5 py-4 border-b border-gray-200 font-bold text-brand tabular-nums text-sm whitespace-nowrap">
                     $
-                    {c.ltv.toLocaleString("en-US", {
+                    {customer.ltv.toLocaleString("en-US", {
                       minimumFractionDigits: 2,
                       maximumFractionDigits: 2,
                     })}
                   </td>
 
+                  {/* Last Order */}
                   <td className="px-5 py-4 border-b border-gray-200 text-sm text-gray-500 whitespace-nowrap">
-                    {c.lastOrder}
+                    {customer.lastOrder}
                   </td>
 
+                  {/* Joined */}
                   <td className="px-5 py-4 border-b border-gray-200 text-sm text-gray-500 whitespace-nowrap">
-                    {c.joined}
+                    {customer.joined}
                   </td>
 
+                  {/* Actions */}
                   <td className="px-5 py-4 border-b border-gray-200 text-right whitespace-nowrap">
                     <div className="flex items-center justify-end gap-3">
-                      <button className="bg-transparent border-none text-brand text-sm font-medium hover:underline cursor-pointer">
+                      <button
+                        type="button"
+                        className="bg-transparent border-none text-brand text-sm font-medium hover:underline cursor-pointer"
+                      >
                         View
                       </button>
+
                       <button
-                        onClick={() => handleDeleteCustomer(c.id)}
+                        type="button"
+                        onClick={() => handleDeleteCustomer(customer.id)}
                         className="bg-transparent border-none text-risk-text text-sm font-medium hover:underline cursor-pointer"
                       >
                         Delete
@@ -439,6 +511,7 @@ export default function Customers() {
           </table>
         </div>
 
+        {/* Pagination */}
         <div className="flex items-center justify-between px-5 py-4 text-[13px] text-gray-500 border-t border-gray-100">
           <span>
             Showing {rangeStart}–{rangeEnd} of {filtered.length}
@@ -446,32 +519,37 @@ export default function Customers() {
 
           <div className="flex gap-1.5">
             <button
+              type="button"
               disabled={currentPage === 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
               className="w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-500 text-sm disabled:opacity-40"
             >
               ‹
             </button>
 
-            {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(
-              (n) => (
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+              (number) => (
                 <button
-                  key={n}
-                  onClick={() => setPage(n)}
+                  type="button"
+                  key={number}
+                  onClick={() => setPage(number)}
                   className={`w-8 h-8 rounded-lg border text-sm ${
-                    n === currentPage
+                    number === currentPage
                       ? "bg-brand border-brand text-white"
                       : "bg-white border-gray-200 text-gray-500"
                   }`}
                 >
-                  {n}
+                  {number}
                 </button>
               ),
             )}
 
             <button
+              type="button"
               disabled={currentPage === totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() =>
+                setPage((current) => Math.min(totalPages, current + 1))
+              }
               className="w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-500 text-sm disabled:opacity-40"
             >
               ›
@@ -480,6 +558,7 @@ export default function Customers() {
         </div>
       </div>
 
+      {/* Add Customer Modal */}
       {showAddModal && (
         <div
           className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4"
@@ -487,11 +566,13 @@ export default function Customers() {
         >
           <div
             className="bg-white border border-gray-200 rounded-xl shadow-sm w-full max-w-md p-6"
-            onClick={(e) => e.stopPropagation()}
+            onClick={(event) => event.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-bold text-gray-900">Add Customer</h2>
+
               <button
+                type="button"
                 onClick={closeAddModal}
                 className="text-gray-400 hover:text-gray-600 bg-transparent border-none cursor-pointer"
               >
@@ -501,40 +582,50 @@ export default function Customers() {
 
             <form onSubmit={handleAddCustomer}>
               <div className="flex flex-col gap-4">
+                {/* Name */}
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
                     Name
                   </label>
+
                   <input
                     type="text"
                     value={form.name}
-                    onChange={(e) => handleFormChange("name", e.target.value)}
+                    onChange={(event) =>
+                      handleFormChange("name", event.target.value)
+                    }
                     placeholder="Full name"
                     className="w-full bg-gray-50 border border-gray-200 rounded-[10px] px-4 py-3 text-sm text-gray-900 outline-none"
                   />
                 </div>
 
+                {/* Email */}
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
                     Email
                   </label>
+
                   <input
                     type="email"
                     value={form.email}
-                    onChange={(e) => handleFormChange("email", e.target.value)}
+                    onChange={(event) =>
+                      handleFormChange("email", event.target.value)
+                    }
                     placeholder="name@email.com"
                     className="w-full bg-gray-50 border border-gray-200 rounded-[10px] px-4 py-3 text-sm text-gray-900 outline-none"
                   />
                 </div>
 
+                {/* Segment */}
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
                     Segment
                   </label>
+
                   <select
                     value={form.segment}
-                    onChange={(e) =>
-                      handleFormChange("segment", e.target.value)
+                    onChange={(event) =>
+                      handleFormChange("segment", event.target.value)
                     }
                     className="w-full bg-gray-50 border border-gray-200 rounded-[10px] px-4 py-3 text-sm text-gray-900 outline-none"
                   >
@@ -546,15 +637,17 @@ export default function Customers() {
                   </select>
                 </div>
 
+                {/* Location */}
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
                     Location
                   </label>
+
                   <input
                     type="text"
                     value={form.location}
-                    onChange={(e) =>
-                      handleFormChange("location", e.target.value)
+                    onChange={(event) =>
+                      handleFormChange("location", event.target.value)
                     }
                     placeholder="City, State"
                     className="w-full bg-gray-50 border border-gray-200 rounded-[10px] px-4 py-3 text-sm text-gray-900 outline-none"
@@ -574,6 +667,7 @@ export default function Customers() {
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
                   className="rounded-[10px] px-4 py-2.5 text-sm font-semibold text-white bg-brand hover:opacity-90"
