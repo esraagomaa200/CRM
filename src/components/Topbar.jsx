@@ -1,30 +1,74 @@
 import React, { useState } from "react";
 
 const NOTIFICATIONS = [
-  { id: 1, color: "bg-brand", title: "New order received", desc: "ORD-4819 from Priya Sharma", time: "2 min ago" },
-  { id: 2, color: "bg-amber-500", title: "Low stock alert", desc: "Ergonomic Standing Desk — 23 left", time: "18 min ago" },
-  { id: 3, color: "bg-red-500", title: "Refund processed", desc: "ORD-4818 — $179.99 refunded", time: "1 hr ago" },
+  {
+    id: 1,
+    color: "bg-brand",
+    title: "New order received",
+    desc: "ORD-4819 from Priya Sharma",
+    time: "2 min ago",
+  },
+  {
+    id: 2,
+    color: "bg-amber-500",
+    title: "Low stock alert",
+    desc: "Ergonomic Standing Desk — 23 left",
+    time: "18 min ago",
+  },
+  {
+    id: 3,
+    color: "bg-red-500",
+    title: "Refund processed",
+    desc: "ORD-4818 — $179.99 refunded",
+    time: "1 hr ago",
+  },
 ];
 
 function IconSearch() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-4-4" />
     </svg>
   );
 }
+
 function IconBell() {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9" />
       <path d="M13.73 21a2 2 0 0 1-3.46 0" />
     </svg>
   );
 }
+
 function IconMenu() {
   return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="18" x2="20" y2="18" />
     </svg>
   );
 }
@@ -33,77 +77,87 @@ export default function Topbar({ onMenuClick }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="flex items-center justify-between gap-3 md:gap-6 px-4 md:px-8 py-4 bg-white border-b border-gray-200 sticky top-0 z-20">
-      <button className="md:hidden text-gray-500 shrink-0" onClick={onMenuClick}>
-        <IconMenu />
-      </button>
+    <header className="h-20 bg-white border-b border-gray-200 flex items-center px-4 md:px-8">
+      <div className="flex items-center justify-between w-full">
+        {/* Left side */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onMenuClick}
+            className="md:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100"
+          >
+            <IconMenu />
+          </button>
 
-      <div className="flex-1 max-w-[520px] flex items-center gap-2.5 bg-appbg border border-gray-200 rounded-[10px] px-3.5 py-2.5 text-gray-400 min-w-0">
-        <IconSearch />
-        <input
-          type="text"
-          placeholder="Search orders, products, customers..."
-          className="border-none bg-transparent outline-none text-sm text-gray-900 w-full min-w-0"
-        />
-      </div>
+          <div className="hidden sm:flex items-center gap-2 text-gray-400">
+            <IconSearch />
 
-      <div className="flex items-center gap-3 md:gap-5 shrink-0">
+            <input
+              type="text"
+              placeholder="Search..."
+              className="w-40 md:w-56 bg-transparent border-none outline-none text-sm text-gray-900 placeholder:text-gray-400"
+            />
+          </div>
+        </div>
+
+        {/* Right side */}
         <div className="relative">
           <button
-            className="relative bg-transparent border-none text-gray-500 cursor-pointer p-1.5 flex hover:bg-gray-100 rounded-lg transition-colors duration-200"
-            onClick={() => setOpen((v) => !v)}
+            type="button"
+            onClick={() => setOpen((value) => !value)}
+            className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
           >
             <IconBell />
+
             <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 border-2 border-white" />
           </button>
 
+          {/* Notifications */}
           {open && (
-  <div className="absolute top-[calc(100%+12px)] right-0 w-72 sm:w-80 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-10">
+            <div className="absolute top-[calc(100%+12px)] right-0 w-72 sm:w-80 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+                <strong className="text-sm text-gray-900">
+                  Notifications
+                </strong>
 
-    <div className="flex items-center justify-between px-5 py-4 text-sm border-b border-gray-100">
-  <strong>Notifications</strong>
+                <button
+                  type="button"
+                  className="text-brand text-xs font-semibold hover:underline"
+                >
+                  Mark all read
+                </button>
+              </div>
 
-  <button className="bg-transparent border-none text-brand text-xs font-semibold cursor-pointer">
-    Mark all read
-  </button>
-</div>
+              {/* Notification list */}
+              <div>
+                {NOTIFICATIONS.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className="flex gap-3 px-5 py-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
+                  >
+                    <span
+                      className={`w-2.5 h-2.5 rounded-full ${notification.color} mt-1.5 shrink-0`}
+                    />
 
-    <ul className="flex flex-col list-none m-0 p-0">
-      {NOTIFICATIONS.map((n) => (
-        <li
-          key={n.id}
-          className="flex gap-2.5 items-start px-5 py-4 hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
-        >
-          <span
-            className={`w-2.5 h-2.5 rounded-full mt-1.5 shrink-0 ${n.color}`}
-          />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {notification.title}
+                      </p>
 
-          <div>
-            <div className="text-[13px] font-semibold text-gray-900">
-              {n.title}
+                      <p className="text-xs text-gray-500 mt-1">
+                        {notification.desc}
+                      </p>
+
+                      <p className="text-[11px] text-gray-400 mt-1.5">
+                        {notification.time}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-
-            <div className="text-sm text-gray-500 mt-0.5">
-              {n.desc}
-            </div>
-
-            <div className="text-xs text-gray-400 mt-1">
-              {n.time}
-            </div>
-          </div>
-        </li>
-      ))}
-    </ul>
-
-  </div>
-)}
-        </div>
-
-        <div className="hidden sm:flex items-center gap-2.5">
-          <span className="w-[34px] h-[34px] rounded-full bg-brand-light text-brand flex items-center justify-center font-bold text-xs">
-            JK
-          </span>
-          <span className="text-sm font-semibold text-gray-900">Jordan Kim</span>
+          )}
         </div>
       </div>
     </header>
