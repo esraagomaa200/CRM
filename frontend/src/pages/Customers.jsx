@@ -1,95 +1,5 @@
-import React, { useMemo, useState } from "react";
-
-const INITIAL_CUSTOMERS = [
-  {
-    id: 1,
-    name: "Marisol Vega",
-    email: "marisol.vega@email.com",
-    segment: "vip",
-    location: "Austin, TX",
-    orders: 18,
-    ltv: 4820.5,
-    lastOrder: "Aug 28, 2026",
-    joined: "Jan 14, 2024",
-  },
-  {
-    id: 2,
-    name: "Theo Nakamura",
-    email: "theo.nakamura@email.com",
-    segment: "regular",
-    location: "Portland, OR",
-    orders: 5,
-    ltv: 1240,
-    lastOrder: "Sep 1, 2026",
-    joined: "Mar 3, 2025",
-  },
-  {
-    id: 3,
-    name: "Priya Sharma",
-    email: "priya.sharma@email.com",
-    segment: "new",
-    location: "Seattle, WA",
-    orders: 1,
-    ltv: 429.5,
-    lastOrder: "Sep 2, 2026",
-    joined: "Aug 30, 2026",
-  },
-  {
-    id: 4,
-    name: "Rafael Okafor",
-    email: "rafael.okafor@email.com",
-    segment: "at-risk",
-    location: "Chicago, IL",
-    orders: 4,
-    ltv: 892,
-    lastOrder: "Aug 30, 2026",
-    joined: "Jul 22, 2024",
-  },
-  {
-    id: 5,
-    name: "Sienna Holbrook",
-    email: "sienna.holbrook@email.com",
-    segment: "vip",
-    location: "Denver, CO",
-    orders: 24,
-    ltv: 6102.75,
-    lastOrder: "Aug 25, 2026",
-    joined: "Oct 5, 2023",
-  },
-  {
-    id: 6,
-    name: "Leon Marchetti",
-    email: "leon.marchetti@email.com",
-    segment: "regular",
-    location: "Miami, FL",
-    orders: 7,
-    ltv: 1890,
-    lastOrder: "Sep 1, 2026",
-    joined: "Feb 18, 2025",
-  },
-  {
-    id: 7,
-    name: "Anika Brennan",
-    email: "anika.brennan@email.com",
-    segment: "at-risk",
-    location: "Boston, MA",
-    orders: 9,
-    ltv: 2100,
-    lastOrder: "Jun 14, 2026",
-    joined: "Apr 1, 2024",
-  },
-  {
-    id: 8,
-    name: "Darius Wren",
-    email: "darius.wren@email.com",
-    segment: "new",
-    location: "Atlanta, GA",
-    orders: 1,
-    ltv: 179.99,
-    lastOrder: "Aug 31, 2026",
-    joined: "Aug 31, 2026",
-  },
-];
+import React, { useMemo, useState, useEffect } from "react";
+import { customersApi } from "../lib/api";
 
 const SEGMENTS = {
   vip: "VIP",
@@ -121,14 +31,6 @@ function getInitials(name) {
   const last = parts[parts.length - 1] || "";
 
   return `${first[0] || ""}${last[0] || ""}`;
-}
-
-function todayLabel() {
-  return new Date().toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function IconSearch() {
@@ -180,10 +82,34 @@ function IconClose() {
 }
 
 export default function Customers() {
-  const [customers, setCustomers] = useState(INITIAL_CUSTOMERS);
+  const [customers, setCustomers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [tab, setTab] = useState("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    customersApi
+      .list()
+      .then((data) => {
+        if (!cancelled) {
+          setCustomers(data);
+          setLoadError("");
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setLoadError(err.message || "Failed to load customers");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [form, setForm] = useState(EMPTY_FORM);
@@ -266,7 +192,7 @@ export default function Customers() {
     setFormError("");
   }
 
-  function handleAddCustomer(event) {
+  async function handleAddCustomer(event) {
     event.preventDefault();
 
     const name = form.name.trim();
@@ -278,46 +204,55 @@ export default function Customers() {
       return;
     }
 
-    const nextId = customers.length
-      ? Math.max(...customers.map((customer) => customer.id)) + 1
-      : 1;
+    try {
+      const newCustomer = await customersApi.create({
+        name,
+        email,
+        segment: form.segment,
+        location,
+      });
 
-    const newCustomer = {
-      id: nextId,
-      name,
-      email,
-      segment: form.segment,
-      location: location || "—",
-      orders: 0,
-      ltv: 0,
-      lastOrder: "—",
-      joined: todayLabel(),
-    };
+      setCustomers((currentCustomers) => [newCustomer, ...currentCustomers]);
 
-    setCustomers((currentCustomers) => [newCustomer, ...currentCustomers]);
-
-    setShowAddModal(false);
-    setForm(EMPTY_FORM);
-    setFormError("");
-    setTab("all");
-    setSearch("");
-    setPage(1);
+      setShowAddModal(false);
+      setForm(EMPTY_FORM);
+      setFormError("");
+      setTab("all");
+      setSearch("");
+      setPage(1);
+    } catch (err) {
+      setFormError(err.message || "Failed to add customer.");
+    }
   }
 
-  function handleDeleteCustomer(id) {
+  async function handleDeleteCustomer(id) {
     const confirmed = window.confirm("Remove this customer?");
 
     if (!confirmed) {
       return;
     }
 
-    setCustomers((currentCustomers) =>
-      currentCustomers.filter((customer) => customer.id !== id),
-    );
+    try {
+      await customersApi.remove(id);
+      setCustomers((currentCustomers) =>
+        currentCustomers.filter((customer) => customer.id !== id),
+      );
+    } catch (err) {
+      window.alert(err.message || "Failed to delete customer.");
+    }
+  }
+
+  if (loading) {
+    return <div className="text-center text-gray-500 py-20">Loading customers…</div>;
   }
 
   return (
     <div>
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm mb-5">
+          {loadError} — make sure the backend is running (`npm run dev` in `backend/`).
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
