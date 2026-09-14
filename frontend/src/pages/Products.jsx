@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { initialProducts } from '../data/products';
+import React, { useState, useMemo, useEffect } from 'react';
+import { productsApi } from '../lib/api';
 import ProductHeader from '../components/ProductHeader';
 import ProductFilters from '../components/ProductFilters';
 import ProductTable from '../components/ProductTable';
@@ -8,10 +8,34 @@ import ProductModal from '../components/ProductModal';
 import DeleteModal from '../components/DeleteModal';
 
 export default function Products() {
-  const [products, setProducts] = useState(initialProducts);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [selectedIds, setSelectedIds] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    productsApi
+      .list()
+      .then((data) => {
+        if (!cancelled) {
+          setProducts(data);
+          setError('');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || 'Failed to load products');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
@@ -22,10 +46,10 @@ export default function Products() {
   const [editingProduct, setEditingProduct] = useState(null);
   const [deletingProduct, setDeletingProduct] = useState(null);
 
-  // Extract Categories dynamically
+  // Extract Categories dynamically from server data
   const categories = useMemo(() => {
-    return Array.from(new Set(initialProducts.map((p) => p.category)));
-  }, []);
+    return Array.from(new Set(products.map((p) => p.category)));
+  }, [products]);
 
   // Filter Products Logic
   const filteredProducts = useMemo(() => {
@@ -46,28 +70,54 @@ export default function Products() {
   const endIndex = startIndex + itemsPerPage;
   const currentProducts = filteredProducts.slice(startIndex, endIndex);
 
-  // Handlers
-  const handleSaveProduct = (formData) => {
-    if (editingProduct) {
-      setProducts((prev) =>
-        prev.map((p) => (p.id === editingProduct.id ? { ...p, ...formData } : p))
-      );
-    } else {
-      setProducts((prev) => [
-        { ...formData, id: Date.now() },
-        ...prev,
-      ]);
+  // Handlers (persisted to backend)
+  const handleSaveProduct = async (formData) => {
+    try {
+      if (editingProduct) {
+        const updated = await productsApi.update(editingProduct.id, formData);
+        setProducts((prev) =>
+          prev.map((p) => (p.id === editingProduct.id ? updated : p))
+        );
+      } else {
+        const created = await productsApi.create(formData);
+        setProducts((prev) => [created, ...prev]);
+      }
+      setIsProductModalOpen(false);
+      setEditingProduct(null);
+    } catch (err) {
+      alert(err.message || 'Failed to save product');
     }
-    setIsProductModalOpen(false);
-    setEditingProduct(null);
   };
 
-  const handleDeleteConfirm = () => {
+  const handleDeleteConfirm = async () => {
     if (deletingProduct) {
-      setProducts((prev) => prev.filter((p) => p.id !== deletingProduct.id));
-      setDeletingProduct(null);
+      try {
+        await productsApi.remove(deletingProduct.id);
+        setProducts((prev) => prev.filter((p) => p.id !== deletingProduct.id));
+        setDeletingProduct(null);
+      } catch (err) {
+        alert(err.message || 'Failed to delete product');
+      }
     }
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto p-4 sm:p-8 text-center text-slate-500 py-20">
+        Loading products…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-6xl mx-auto p-4 sm:p-8">
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
+          {error} — make sure the backend is running (`npm run dev` in `backend/`).
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto p-4 sm:p-8">
