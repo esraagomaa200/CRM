@@ -58,7 +58,7 @@ const NAV_ITEMS = [
   { to: "/", label: "Dashboard", icon: IconGrid },
   { to: "/products", label: "Products", icon: IconBox },
   { to: "/orders", label: "Orders", icon: IconCart },
-  { to: "/customers", label: "Customers", icon: IconUsers, dot: true },
+  { to: "/customers", label: "Customers", icon: IconUsers },
   { to: "/analytics", label: "Analytics", icon: IconChart },
 ];
 
@@ -90,7 +90,7 @@ export default function Sidebar({ open, onClose }) {
         </div>
 
         <nav className="flex flex-col gap-1 px-4 py-2 flex-1">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, dot }) => (
+          {NAV_ITEMS.map(({ to, label, icon: Icon}) => (
             <NavLink
               key={to}
               to={to}
@@ -106,7 +106,6 @@ export default function Sidebar({ open, onClose }) {
             >
               <Icon />
               <span>{label}</span>
-              {dot && <span className="w-1.5 h-1.5 rounded-full bg-brand ml-auto" />}
             </NavLink>
           ))}
         </nav>
