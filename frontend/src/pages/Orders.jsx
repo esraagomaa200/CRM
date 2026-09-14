@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ordersApi } from '../lib/api';
+import { ordersApi, customersApi } from '../lib/api';
 
 const FILTERS = ['All', 'Processing', 'Delivered', 'Cancelled'];
 
@@ -17,6 +17,7 @@ const STATUS_DOT = {
 
 export default function Orders() {
     const [orders, setOrders] = useState([]);
+    const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState('');
 
@@ -31,11 +32,11 @@ export default function Orders() {
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
-        ordersApi
-            .list()
-            .then((data) => {
+        Promise.all([ordersApi.list(), customersApi.list()])
+            .then(([ordersData, customersData]) => {
                 if (!cancelled) {
-                    setOrders(data);
+                    setOrders(ordersData);
+                    setCustomers(customersData);
                     setLoadError('');
                 }
             })
@@ -207,7 +208,7 @@ export default function Orders() {
                                             {order.product}
                                         </td>
                                         <td className="px-5 py-4 border-b border-gray-200 whitespace-nowrap font-bold text-brand tabular-nums text-sm">
-                                            {Number(order.price).toLocaleString()} EGP
+                                            ${Number(order.price).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                         </td>
                                         <td className="px-5 py-4 border-b border-gray-200 whitespace-nowrap">
                                             <span className={`inline-flex items-center gap-2 rounded-full pl-2 pr-1 py-1 text-xs font-semibold ${STATUS_BADGE[order.status]}`}>
@@ -277,16 +278,32 @@ export default function Orders() {
                             <div className="flex flex-col gap-4">
                                 <div>
                                     <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
-                                        Customer Name
+                                        Customer
                                     </label>
-                                    <input
-                                        type="text"
-                                        placeholder="e.g. Marisol Vega"
-                                        value={newCustomer}
-                                        onChange={(e) => setNewCustomer(e.target.value)}
-                                        required
-                                        className="w-full bg-gray-50 border border-gray-200 rounded-[10px] px-4 py-3 text-sm text-gray-900 outline-none"
-                                    />
+                                    {customers.length > 0 ? (
+                                        <select
+                                            value={newCustomer}
+                                            onChange={(e) => setNewCustomer(e.target.value)}
+                                            required
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-[10px] px-4 py-3 text-sm text-gray-900 outline-none"
+                                        >
+                                            <option value="">Select a customer…</option>
+                                            {customers.map((c) => (
+                                                <option key={c.id} value={c.name}>
+                                                    {c.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. Marisol Vega"
+                                            value={newCustomer}
+                                            onChange={(e) => setNewCustomer(e.target.value)}
+                                            required
+                                            className="w-full bg-gray-50 border border-gray-200 rounded-[10px] px-4 py-3 text-sm text-gray-900 outline-none"
+                                        />
+                                    )}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
@@ -303,11 +320,11 @@ export default function Orders() {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
-                                        Price (EGP)
+                                        Price ($)
                                     </label>
                                     <input
                                         type="number"
-                                        placeholder="e.g. 25000"
+                                        placeholder="e.g. 1999"
                                         value={newPrice}
                                         onChange={(e) => setNewPrice(e.target.value)}
                                         required

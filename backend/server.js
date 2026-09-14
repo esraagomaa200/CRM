@@ -11,17 +11,39 @@ app.use(express.json());
 // ---------- helpers ----------
 const ORDER_STATUSES = ["Processing", "Delivered", "Cancelled"];
 
+function formatDay(isoDatetime) {
+  if (!isoDatetime) return "";
+  const d = new Date(isoDatetime.replace(" ", "T"));
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+// Live per-customer aggregates from the orders table (by customer name).
+// LTV = sum of non-cancelled orders; count = number of non-cancelled orders.
+// Returns null only when the customer has no orders at all (stored values are kept then).
+function customerOrderStats(name) {
+  const rows = db
+    .prepare("SELECT price, status, created_at FROM orders WHERE customer = ?")
+    .all(name);
+  if (rows.length === 0) return null;
+  const valid = rows.filter((r) => r.status !== "Cancelled");
+  const ltv = valid.reduce((sum, r) => sum + (Number(r.price) || 0), 0);
+  const latest = rows.map((r) => r.created_at).sort().pop();
+  return { orders: valid.length, ltv: Math.round(ltv * 100) / 100, lastOrder: formatDay(latest) || "—" };
+}
+
 function toCustomer(row) {
   if (!row) return row;
+  const live = customerOrderStats(row.name);
   return {
     id: row.id,
     name: row.name,
     email: row.email,
     segment: row.segment,
     location: row.location,
-    orders: row.orders_count,
-    ltv: row.ltv,
-    lastOrder: row.last_order,
+    orders: live ? live.orders : row.orders_count,
+    ltv: live ? live.ltv : row.ltv,
+    lastOrder: live ? live.lastOrder : row.last_order || "—",
     joined: row.joined,
   };
 }
@@ -47,6 +69,63 @@ app.get("/api/stats", (req, res) => {
     .prepare("SELECT COUNT(*) AS n FROM products WHERE stock <= 10")
     .get().n;
   res.json({ products, customers, orders, lowStock });
+});
+
+// ---------- dashboard (one call for the whole Dashboard page) ----------
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+app.get("/api/dashboard", (req, res) => {
+  const totalRevenue =
+    db.prepare("SELECT COALESCE(SUM(price), 0) AS total FROM orders WHERE status != 'Cancelled'").get()
+      .total;
+  const activeOrders = db.prepare("SELECT COUNT(*) AS n FROM orders WHERE status = 'Processing'").get().n;
+  const totalCustomers = db.prepare("SELECT COUNT(*) AS n FROM customers").get().n;
+  const totalProducts = db.prepare("SELECT COUNT(*) AS n FROM products").get().n;
+  const lowStock = db.prepare("SELECT COUNT(*) AS n FROM products WHERE stock <= 10").get().n;
+
+  const recentOrders = db
+    .prepare(
+      `SELECT o.id, o.customer, c.email AS email, o.product, o.price AS amount, o.status,
+              substr(o.created_at, 1, 10) AS date
+       FROM orders o LEFT JOIN customers c ON c.name = o.customer
+       ORDER BY o.rowid DESC LIMIT 6`
+    )
+    .all();
+
+  const topProducts = db
+    .prepare(
+      `SELECT product AS name, COUNT(*) AS units FROM orders
+       WHERE status != 'Cancelled' GROUP BY product
+       ORDER BY units DESC, name ASC LIMIT 5`
+    )
+    .all();
+
+  // Monthly revenue (non-cancelled), last 7 months ending at the latest order month
+  const monthly = db
+    .prepare(
+      `SELECT substr(created_at, 1, 7) AS ym, SUM(price) AS total FROM orders
+       WHERE status != 'Cancelled' GROUP BY ym ORDER BY ym`
+    )
+    .all();
+  const latest = monthly.length ? monthly[monthly.length - 1].ym : new Date().toISOString().slice(0, 7);
+  const [endY, endM] = latest.split("-").map(Number);
+  const totalsByYm = Object.fromEntries(monthly.map((m) => [m.ym, m.total]));
+  const revenueTrend = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(endY, endM - 1 - i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    revenueTrend.push({ month: MONTH_LABELS[d.getMonth()], value: totalsByYm[ym] || 0 });
+  }
+  const last = revenueTrend[revenueTrend.length - 1].value;
+  const prev = revenueTrend[revenueTrend.length - 2].value;
+  const revenueDelta = prev > 0 ? +(((last - prev) / prev) * 100).toFixed(1) : null;
+
+  res.json({
+    stats: { totalRevenue, activeOrders, totalCustomers, totalProducts, lowStock, revenueDelta },
+    recentOrders,
+    topProducts,
+    revenueTrend,
+  });
 });
 
 // ---------- products ----------

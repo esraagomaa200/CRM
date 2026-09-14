@@ -50,3 +50,7 @@ export const ordersApi = {
     request(`/orders/${id(orderId)}`, { method: "PATCH", body: JSON.stringify({ status }) }),
   remove: (orderId) => request(`/orders/${id(orderId)}`, { method: "DELETE" }),
 };
+
+export const dashboardApi = {
+  summary: () => request("/dashboard"),
+};
