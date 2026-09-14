@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { ordersApi } from '../lib/api';
 
 const FILTERS = ['All', 'Processing', 'Delivered', 'Cancelled'];
 
@@ -15,12 +16,9 @@ const STATUS_DOT = {
 };
 
 export default function Orders() {
-    const [orders, setOrders] = useState(
-        JSON.parse(localStorage.getItem('crm_orders_styled')) || [
-            { id: '#ORD-101', customer: 'Marisol Vega', product: 'Dell Laptop', price: 25000, status: 'Delivered' },
-            { id: '#ORD-102', customer: 'Theo Nakamura', product: 'Samsung Mobile', price: 12000, status: 'Processing' }
-        ]
-    );
+    const [orders, setOrders] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
 
     const [currentFilter, setCurrentFilter] = useState('All');
     const [searchQuery, setSearchQuery] = useState('');
@@ -30,39 +28,67 @@ export default function Orders() {
     const [newPrice, setNewPrice] = useState('');
     const [newStatus, setNewStatus] = useState('Processing');
 
-    const persist = (updated) => {
-        setOrders(updated);
-        localStorage.setItem('crm_orders_styled', JSON.stringify(updated));
-    };
+    useEffect(() => {
+        let cancelled = false;
+        setLoading(true);
+        ordersApi
+            .list()
+            .then((data) => {
+                if (!cancelled) {
+                    setOrders(data);
+                    setLoadError('');
+                }
+            })
+            .catch((err) => {
+                if (!cancelled) setLoadError(err.message || 'Failed to load orders');
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
-    const updateStatus = (index, nextStatus) => {
-        const updated = [...orders];
-        updated[index] = { ...updated[index], status: nextStatus };
-        persist(updated);
-    };
-
-    const deleteOrder = (index) => {
-        if (confirm('Are you sure you want to delete this order?')) {
-            persist(orders.filter((_, i) => i !== index));
+    const updateStatus = async (id, nextStatus) => {
+        try {
+            const updated = await ordersApi.updateStatus(id, nextStatus);
+            setOrders((prev) => prev.map((o) => (o.id === id ? updated : o)));
+        } catch (err) {
+            alert(err.message || 'Failed to update order');
         }
     };
 
-    const handleAddOrder = (e) => {
-        e.preventDefault();
-        const newOrder = {
-            id: '#ORD-' + Math.floor(100 + Math.random() * 900),
-            customer: newCustomer,
-            product: newProduct,
-            price: newPrice,
-            status: newStatus
-        };
-        persist([...orders, newOrder]);
+    const deleteOrder = async (id) => {
+        if (confirm('Are you sure you want to delete this order?')) {
+            try {
+                await ordersApi.remove(id);
+                setOrders((prev) => prev.filter((o) => o.id !== id));
+            } catch (err) {
+                alert(err.message || 'Failed to delete order');
+            }
+        }
+    };
 
-        setNewCustomer('');
-        setNewProduct('');
-        setNewPrice('');
-        setNewStatus('Processing');
-        setShowAddModal(false);
+    const handleAddOrder = async (e) => {
+        e.preventDefault();
+        try {
+            const created = await ordersApi.create({
+                customer: newCustomer,
+                product: newProduct,
+                price: Number(newPrice) || 0,
+                status: newStatus,
+            });
+            setOrders((prev) => [created, ...prev]);
+
+            setNewCustomer('');
+            setNewProduct('');
+            setNewPrice('');
+            setNewStatus('Processing');
+            setShowAddModal(false);
+        } catch (err) {
+            alert(err.message || 'Failed to add order');
+        }
     };
 
     const filteredOrders = orders.filter(order => {
@@ -79,8 +105,17 @@ export default function Orders() {
         Cancelled: orders.filter(o => o.status === 'Cancelled').length,
     };
 
+    if (loading) {
+        return <div className="text-center text-gray-500 py-20">Loading orders…</div>;
+    }
+
     return (
         <div>
+            {loadError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm mb-5">
+                    {loadError} — make sure the backend is running (`npm run dev` in `backend/`).
+                </div>
+            )}
             {/* Header — نفس ستايل Customers */}
             <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
@@ -160,7 +195,6 @@ export default function Orders() {
                         </thead>
                         <tbody>
                             {filteredOrders.map((order) => {
-                                const realIndex = orders.findIndex(o => o.id === order.id);
                                 return (
                                     <tr key={order.id} className="bg-white hover:bg-gray-50 transition-colors">
                                         <td className="px-5 py-4 border-b border-gray-200 whitespace-nowrap font-semibold text-sm text-gray-900">
@@ -180,7 +214,7 @@ export default function Orders() {
                                                 <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[order.status]}`}></span>
                                                 <select
                                                     value={order.status}
-                                                    onChange={(e) => updateStatus(realIndex, e.target.value)}
+                                                    onChange={(e) => updateStatus(order.id, e.target.value)}
                                                     className="bg-transparent border-none outline-none text-xs font-semibold cursor-pointer pr-1"
                                                     aria-label={`Change status for ${order.id}`}
                                                 >
@@ -194,7 +228,7 @@ export default function Orders() {
                                             <div className="flex items-center justify-end gap-3">
                                                 <button
                                                     type="button"
-                                                    onClick={() => deleteOrder(realIndex)}
+                                                    onClick={() => deleteOrder(order.id)}
                                                     title="Delete Order"
                                                     className="bg-transparent border-none text-risk-text text-sm font-medium hover:underline cursor-pointer"
                                                 >
