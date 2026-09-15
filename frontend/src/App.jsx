@@ -8,6 +8,7 @@ import Orders from "./pages/Orders";
 import Analytics from "./pages/Analytics";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import Profile from "./pages/Profile";
 
 function App() {
   return (
@@ -26,7 +27,10 @@ function App() {
         <Route path="/products" element={<Products />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/customers" element={<Customers />} />
-        <Route path="/analytics" element={<Analytics />} />
+
+        <Route path="/analytics" element={<Placeholder title="Analytics" />} />
+        <Route path="/profile" element={<Profile />} />
+
         <Route path="*" element={<Navigate to="/customers" replace />} />
       </Route>
     </Routes>

@@ -132,6 +132,14 @@ function seed() {
   console.log(`Seeded DB (${todayLabel()}): ${products.length} products, ${customers.length} customers, ${orders.length} orders`);
 }
 
+
+try {
+  db.exec("ALTER TABLE users ADD COLUMN birth_date TEXT DEFAULT ''");
+} catch {
+}
+
+seed();
+
 seed();
 
 // One demo login so the Sign In page has something to log in with out of the box.
