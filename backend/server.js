@@ -15,7 +15,7 @@ const ORDER_STATUSES = ["Processing", "Delivered", "Cancelled"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function publicUser(row) {
-  return { id: row.id, name: row.name, email: row.email };
+  return { id: row.id, name: row.name, email: row.email, birthDate: row.birth_date || "" };
 }
 
 function getUserFromToken(token) {
@@ -144,6 +144,31 @@ app.post("/api/auth/login", (req, res) => {
 
 app.get("/api/auth/me", requireAuth, (req, res) => {
   res.json({ user: publicUser(req.user) });
+});
+
+app.put("/api/auth/me", requireAuth, (req, res) => {
+  const { name, email, birthDate } = req.body || {};
+  if (!name?.trim() || !email?.trim()) {
+    return res.status(400).json({ message: "Name and email are required" });
+  }
+  if (!EMAIL_REGEX.test(email.trim())) {
+    return res.status(400).json({ message: "Enter a valid email address" });
+  }
+  try {
+    db.prepare("UPDATE users SET name = ?, email = ?, birth_date = ? WHERE id = ?").run(
+      name.trim(),
+      email.trim().toLowerCase(),
+      birthDate || "",
+      req.user.id
+    );
+    const updated = db.prepare("SELECT * FROM users WHERE id = ?").get(req.user.id);
+    res.json({ user: publicUser(updated) });
+  } catch (err) {
+    if (String(err.message).includes("UNIQUE")) {
+      return res.status(409).json({ message: "Email already in use" });
+    }
+    throw err;
+  }
 });
 
 app.post("/api/auth/logout", (req, res) => {

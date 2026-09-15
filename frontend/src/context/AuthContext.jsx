@@ -63,6 +63,16 @@ export function AuthProvider({ children }) {
     }
   }
 
+  async function updateProfile(payload) {
+  try {
+    const data = await authApi.updateMe(payload, token);
+    setUser(data.user);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message || "Could not update profile." };
+  }
+}
+
   function logout() {
     if (token) authApi.logout(token).catch(() => {});
     localStorage.removeItem(TOKEN_KEY);
@@ -71,7 +81,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated: !!user, user, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated: !!user, user, loading, login, signup, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );

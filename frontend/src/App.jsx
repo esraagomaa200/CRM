@@ -7,6 +7,7 @@ import Products from "./pages/Products";
 import Orders from "./pages/Orders";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import Profile from "./pages/Profile";
 
 function Placeholder({ title }) {
   return (
@@ -34,6 +35,7 @@ function App() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/analytics" element={<Placeholder title="Analytics" />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="*" element={<Navigate to="/customers" replace />} />
       </Route>
     </Routes>
