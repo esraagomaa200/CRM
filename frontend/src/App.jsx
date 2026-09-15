@@ -28,7 +28,7 @@ function App() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/customers" element={<Customers />} />
 
-        <Route path="/analytics" element={<Placeholder title="Analytics" />} />
+        <Route path="/analytics" element={<Analytics />} />
         <Route path="/profile" element={<Profile />} />
 
         <Route path="*" element={<Navigate to="/customers" replace />} />
