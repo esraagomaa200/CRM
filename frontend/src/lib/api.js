@@ -61,5 +61,7 @@ export const authApi = {
   register: (payload) => request("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
   login: (payload) => request("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
   me: (token) => request("/auth/me", {}, token),
+  updateMe: (payload, token) =>
+    request("/auth/me", { method: "PUT", body: JSON.stringify(payload) }, token),
   logout: (token) => request("/auth/logout", { method: "POST" }, token),
 };

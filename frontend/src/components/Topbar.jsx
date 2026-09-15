@@ -75,6 +75,21 @@ function IconMenu() {
   );
 }
 
+function IconChevron() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
+
 export default function Topbar({ onMenuClick }) {
   const [open, setOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -121,92 +136,106 @@ export default function Topbar({ onMenuClick }) {
 
         {/* Right side */}
         <div className="flex items-center gap-2">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setOpen((value) => !value)}
-            className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
-          >
-            <IconBell />
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setOpen((value) => !value)}
+              className="relative p-2 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+            >
+              <IconBell />
 
-            <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 border-2 border-white" />
-          </button>
+              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-red-500 border-2 border-white" />
+            </button>
 
-          {/* Notifications */}
-          {open && (
-            <div className="absolute top-[calc(100%+12px)] right-0 w-72 sm:w-80 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-                <strong className="text-sm text-gray-900">
-                  Notifications
-                </strong>
+            {/* Notifications */}
+            {open && (
+              <div className="absolute top-[calc(100%+12px)] right-0 w-72 sm:w-80 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+                  <strong className="text-sm text-gray-900">
+                    Notifications
+                  </strong>
 
+                  <button
+                    type="button"
+                    className="text-brand text-xs font-semibold hover:underline"
+                  >
+                    Mark all read
+                  </button>
+                </div>
+
+                {/* Notification list */}
+                <div>
+                  {NOTIFICATIONS.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className="flex gap-3 px-5 py-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
+                    >
+                      <span
+                        className={`w-2.5 h-2.5 rounded-full ${notification.color} mt-1.5 shrink-0`}
+                      />
+
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {notification.title}
+                        </p>
+
+                        <p className="text-xs text-gray-500 mt-1">
+                          {notification.desc}
+                        </p>
+
+                        <p className="text-[11px] text-gray-400 mt-1.5">
+                          {notification.time}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Profile / sign out */}
+          <div className="relative hidden sm:flex items-center">
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              className="flex items-center gap-2.5 bg-transparent border-none cursor-pointer p-1 rounded-lg hover:bg-gray-100 transition-colors"
+            >
+              <span className="w-8 h-8 rounded-full bg-brand-light text-brand flex items-center justify-center font-bold text-xs">
+                {initials}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setProfileOpen((v) => !v)}
+              className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+            >
+              <IconChevron />
+            </button>
+
+            {profileOpen && (
+              <div className="absolute top-[calc(100%+12px)] right-0 w-48 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
+                  <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                </div>
                 <button
-                  type="button"
-                  className="text-brand text-xs font-semibold hover:underline"
+                  onClick={() => { setProfileOpen(false); navigate("/profile"); }}
+                  className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors border-b border-gray-100"
                 >
-                  Mark all read
+                  View Profile
+                </button>
+                <button
+                  onClick={handleSignOut}
+                  className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  Sign out
                 </button>
               </div>
-
-              {/* Notification list */}
-              <div>
-                {NOTIFICATIONS.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className="flex gap-3 px-5 py-4 border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
-                  >
-                    <span
-                      className={`w-2.5 h-2.5 rounded-full ${notification.color} mt-1.5 shrink-0`}
-                    />
-
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {notification.title}
-                      </p>
-
-                      <p className="text-xs text-gray-500 mt-1">
-                        {notification.desc}
-                      </p>
-
-                      <p className="text-[11px] text-gray-400 mt-1.5">
-                        {notification.time}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Profile / sign out */}
-        <div className="relative hidden sm:block">
-          <button
-            type="button"
-            onClick={() => setProfileOpen((v) => !v)}
-            className="flex items-center gap-2.5 bg-transparent border-none cursor-pointer p-1 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            <span className="w-8 h-8 rounded-full bg-brand-light text-brand flex items-center justify-center font-bold text-xs">
-              {initials}
-            </span>
-          </button>
-
-          {profileOpen && (
-            <div className="absolute top-[calc(100%+12px)] right-0 w-48 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
-                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
-              </div>
-              <button
-                onClick={handleSignOut}
-                className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-              >
-                Sign out
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         </div>
       </div>
     </header>
