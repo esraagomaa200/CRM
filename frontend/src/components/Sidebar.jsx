@@ -1,5 +1,6 @@
 import React from "react";
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 function IconGrid() {
   return (
@@ -63,6 +64,15 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar({ open, onClose }) {
+  const { user } = useAuth();
+  const displayName = user?.name || "Guest";
+  const initials = displayName
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
   return (
     <>
       {open && (
@@ -113,10 +123,10 @@ export default function Sidebar({ open, onClose }) {
         <div className="p-4 border-t border-gray-200">
           <div className="flex items-center gap-2.5 px-1 py-2">
             <span className="w-9 h-9 rounded-full bg-brand-light text-brand flex items-center justify-center font-bold text-xs shrink-0">
-              JK
+              {initials}
             </span>
             <div>
-              <div className="text-sm font-semibold text-gray-900">Jordan Kim</div>
+              <div className="text-sm font-semibold text-gray-900">{displayName}</div>
               <div className="text-xs text-gray-500">Admin</div>
             </div>
           </div>

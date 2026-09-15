@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const NOTIFICATIONS = [
   {
@@ -75,6 +77,23 @@ function IconMenu() {
 
 export default function Topbar({ onMenuClick }) {
   const [open, setOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+
+  const displayName = user?.name || "Guest";
+  const initials = displayName
+    .split(" ")
+    .map((p) => p[0])
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  function handleSignOut() {
+    setProfileOpen(false);
+    logout();
+    navigate("/signin", { replace: true });
+  }
 
   return (
     <header className="h-20 bg-white border-b border-gray-200 flex items-center px-4 md:px-8">
@@ -101,6 +120,7 @@ export default function Topbar({ onMenuClick }) {
         </div>
 
         {/* Right side */}
+        <div className="flex items-center gap-2">
         <div className="relative">
           <button
             type="button"
@@ -158,6 +178,35 @@ export default function Topbar({ onMenuClick }) {
               </div>
             </div>
           )}
+        </div>
+
+        {/* Profile / sign out */}
+        <div className="relative hidden sm:block">
+          <button
+            type="button"
+            onClick={() => setProfileOpen((v) => !v)}
+            className="flex items-center gap-2.5 bg-transparent border-none cursor-pointer p-1 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <span className="w-8 h-8 rounded-full bg-brand-light text-brand flex items-center justify-center font-bold text-xs">
+              {initials}
+            </span>
+          </button>
+
+          {profileOpen && (
+            <div className="absolute top-[calc(100%+12px)] right-0 w-48 bg-white border border-gray-200 rounded-xl shadow-lg overflow-hidden z-50">
+              <div className="px-4 py-3 border-b border-gray-100">
+                <p className="text-sm font-semibold text-gray-900 truncate">{displayName}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+              </div>
+              <button
+                onClick={handleSignOut}
+                className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
+        </div>
         </div>
       </div>
     </header>

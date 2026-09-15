@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import bcrypt from "bcryptjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const db = new DatabaseSync(path.join(__dirname, "crm.db"));
@@ -37,6 +38,20 @@ db.exec(`
     product TEXT NOT NULL,
     price REAL NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'Processing',
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS sessions (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 `);
@@ -117,6 +132,21 @@ function seed() {
 }
 
 seed();
+
+// One demo login so the Sign In page has something to log in with out of the box.
+function seedDemoUser() {
+  const userCount = db.prepare("SELECT COUNT(*) AS n FROM users").get().n;
+  if (userCount > 0) return;
+  const passwordHash = bcrypt.hashSync("demo1234", 10);
+  db.prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)").run(
+    "Demo Admin",
+    "demo@nexacrm.com",
+    passwordHash
+  );
+  console.log("Seeded demo user: demo@nexacrm.com / demo1234");
+}
+
+seedDemoUser();
 
 // One-time backfill for databases seeded before order dates existed:
 // spread the original 8 seed orders across Mar–Sep 2026 (for the revenue trend),

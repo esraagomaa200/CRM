@@ -7,10 +7,12 @@
 
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
-async function request(path, options = {}) {
+async function request(path, options = {}, token) {
+  const headers = { "Content-Type": "application/json", ...(options.headers || {}) };
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch(`${API_BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...options,
+    headers,
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -53,4 +55,11 @@ export const ordersApi = {
 
 export const dashboardApi = {
   summary: () => request("/dashboard"),
+};
+
+export const authApi = {
+  register: (payload) => request("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
+  login: (payload) => request("/auth/login", { method: "POST", body: JSON.stringify(payload) }),
+  me: (token) => request("/auth/me", {}, token),
+  logout: (token) => request("/auth/logout", { method: "POST" }, token),
 };

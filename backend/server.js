@@ -1,5 +1,7 @@
 import express from "express";
 import cors from "cors";
+import crypto from "node:crypto";
+import bcrypt from "bcryptjs";
 import db from "./db.js";
 
 const app = express();
@@ -10,6 +12,28 @@ app.use(express.json());
 
 // ---------- helpers ----------
 const ORDER_STATUSES = ["Processing", "Delivered", "Cancelled"];
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function publicUser(row) {
+  return { id: row.id, name: row.name, email: row.email };
+}
+
+function getUserFromToken(token) {
+  if (!token) return null;
+  const session = db.prepare("SELECT user_id FROM sessions WHERE token = ?").get(token);
+  if (!session) return null;
+  return db.prepare("SELECT * FROM users WHERE id = ?").get(session.user_id) || null;
+}
+
+function requireAuth(req, res, next) {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  const user = getUserFromToken(token);
+  if (!user) return res.status(401).json({ message: "Not authenticated" });
+  req.user = user;
+  req.token = token;
+  next();
+}
 
 function formatDay(isoDatetime) {
   if (!isoDatetime) return "";
@@ -69,6 +93,64 @@ app.get("/api/stats", (req, res) => {
     .prepare("SELECT COUNT(*) AS n FROM products WHERE stock <= 10")
     .get().n;
   res.json({ products, customers, orders, lowStock });
+});
+
+// ---------- auth ----------
+app.post("/api/auth/register", (req, res) => {
+  const { name, email, password } = req.body || {};
+  if (!name?.trim() || !email?.trim() || !password) {
+    return res.status(400).json({ message: "Name, email and password are required" });
+  }
+  if (!EMAIL_REGEX.test(email.trim())) {
+    return res.status(400).json({ message: "Enter a valid email address" });
+  }
+  if (password.length < 6) {
+    return res.status(400).json({ message: "Password must be at least 6 characters" });
+  }
+
+  const existing = db.prepare("SELECT id FROM users WHERE email = ?").get(email.trim().toLowerCase());
+  if (existing) {
+    return res.status(409).json({ message: "An account with this email already exists" });
+  }
+
+  const passwordHash = bcrypt.hashSync(password, 10);
+  const result = db
+    .prepare("INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)")
+    .run(name.trim(), email.trim().toLowerCase(), passwordHash);
+  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
+
+  const token = crypto.randomBytes(32).toString("hex");
+  db.prepare("INSERT INTO sessions (token, user_id) VALUES (?, ?)").run(token, user.id);
+
+  res.status(201).json({ token, user: publicUser(user) });
+});
+
+app.post("/api/auth/login", (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email?.trim() || !password) {
+    return res.status(400).json({ message: "Email and password are required" });
+  }
+
+  const user = db.prepare("SELECT * FROM users WHERE email = ?").get(email.trim().toLowerCase());
+  if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    return res.status(401).json({ message: "Invalid email or password" });
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  db.prepare("INSERT INTO sessions (token, user_id) VALUES (?, ?)").run(token, user.id);
+
+  res.json({ token, user: publicUser(user) });
+});
+
+app.get("/api/auth/me", requireAuth, (req, res) => {
+  res.json({ user: publicUser(req.user) });
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  const header = req.headers.authorization || "";
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  if (token) db.prepare("DELETE FROM sessions WHERE token = ?").run(token);
+  res.json({ ok: true });
 });
 
 // ---------- dashboard (one call for the whole Dashboard page) ----------

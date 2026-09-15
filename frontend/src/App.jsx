@@ -1,9 +1,12 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import DashboardLayout from "./components/DashboardLayout";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Dashboard from "./components/Dashboard";
 import Customers from "./pages/Customers";
 import Products from "./pages/Products";
 import Orders from "./pages/Orders";
+import SignIn from "./pages/SignIn";
+import SignUp from "./pages/SignUp";
 
 function Placeholder({ title }) {
   return (
@@ -16,7 +19,16 @@ function Placeholder({ title }) {
 function App() {
   return (
     <Routes>
-      <Route element={<DashboardLayout />}>
+      <Route path="/signin" element={<SignIn />} />
+      <Route path="/signup" element={<SignUp />} />
+
+      <Route
+        element={
+          <ProtectedRoute>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }
+      >
         <Route path="/" element={<Dashboard/>} />
         <Route path="/products" element={<Products />} />
         <Route path="/orders" element={<Orders />} />
