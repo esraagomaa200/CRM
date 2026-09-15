@@ -38,6 +38,7 @@ db.exec(`
     product TEXT NOT NULL,
     price REAL NOT NULL DEFAULT 0,
     status TEXT NOT NULL DEFAULT 'Processing',
+    channel TEXT NOT NULL DEFAULT 'Direct',
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -103,14 +104,14 @@ function seed() {
   ];
 
   const orders = [
-    { id: "#ORD-101", customer: "Marisol Vega", product: 'Apple MacBook Pro 14" M4', price: 1999.0, status: "Delivered", created_at: "2026-03-14 12:00:00" },
-    { id: "#ORD-102", customer: "Theo Nakamura", product: "Samsung Galaxy S25 Ultra", price: 1299.99, status: "Processing", created_at: "2026-04-09 12:00:00" },
-    { id: "#ORD-103", customer: "Priya Sharma", product: "Apple AirPods Pro 2", price: 249.0, status: "Delivered", created_at: "2026-05-21 12:00:00" },
-    { id: "#ORD-104", customer: "Rafael Okafor", product: "Keychron K8 Pro Keyboard", price: 119.0, status: "Cancelled", created_at: "2026-06-05 12:00:00" },
-    { id: "#ORD-105", customer: "Sienna Holbrook", product: 'LG UltraFine 27" 4K Monitor', price: 549.0, status: "Delivered", created_at: "2026-07-18 12:00:00" },
-    { id: "#ORD-106", customer: "Leon Marchetti", product: "Logitech MX Master 3S", price: 99.99, status: "Processing", created_at: "2026-08-11 12:00:00" },
-    { id: "#ORD-107", customer: "Anika Brennan", product: "Sony WH-1000XM5 Headphones", price: 349.99, status: "Processing", created_at: "2026-09-02 12:00:00" },
-    { id: "#ORD-108", customer: "Layla Hassan", product: "iPhone 16 Pro", price: 1199.0, status: "Delivered", created_at: "2026-09-10 12:00:00" },
+    { id: "#ORD-101", customer: "Marisol Vega", product: 'Apple MacBook Pro 14" M4', price: 1999.0, status: "Delivered", channel: "Direct", created_at: "2026-03-14 12:00:00" },
+    { id: "#ORD-102", customer: "Theo Nakamura", product: "Samsung Galaxy S25 Ultra", price: 1299.99, status: "Processing", channel: "Organic Search", created_at: "2026-04-09 12:00:00" },
+    { id: "#ORD-103", customer: "Priya Sharma", product: "Apple AirPods Pro 2", price: 249.0, status: "Delivered", channel: "Direct", created_at: "2026-05-21 12:00:00" },
+    { id: "#ORD-104", customer: "Rafael Okafor", product: "Keychron K8 Pro Keyboard", price: 119.0, status: "Cancelled", channel: "Social Media", created_at: "2026-06-05 12:00:00" },
+    { id: "#ORD-105", customer: "Sienna Holbrook", product: 'LG UltraFine 27" 4K Monitor', price: 549.0, status: "Delivered", channel: "Organic Search", created_at: "2026-07-18 12:00:00" },
+    { id: "#ORD-106", customer: "Leon Marchetti", product: "Logitech MX Master 3S", price: 99.99, status: "Processing", channel: "Paid Ads", created_at: "2026-08-11 12:00:00" },
+    { id: "#ORD-107", customer: "Anika Brennan", product: "Sony WH-1000XM5 Headphones", price: 349.99, status: "Processing", channel: "Referral", created_at: "2026-09-02 12:00:00" },
+    { id: "#ORD-108", customer: "Layla Hassan", product: "iPhone 16 Pro", price: 1199.0, status: "Delivered", channel: "Direct", created_at: "2026-09-10 12:00:00" },
   ];
 
   const insertProduct = db.prepare(
@@ -120,13 +121,13 @@ function seed() {
     "INSERT OR IGNORE INTO customers (name, email, segment, location, orders_count, ltv, last_order, joined) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
   );
   const insertOrder = db.prepare(
-    "INSERT OR IGNORE INTO orders (id, customer, product, price, status, created_at) VALUES (?, ?, ?, ?, ?, ?)"
+    "INSERT OR IGNORE INTO orders (id, customer, product, price, status, channel, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
   );
 
   for (const p of products) insertProduct.run(p.name, p.sku, p.category, p.price, p.stock, p.image);
   for (const c of customers)
     insertCustomer.run(c.name, c.email, c.segment, c.location, c.orders_count, c.ltv, c.last_order, c.joined);
-  for (const o of orders) insertOrder.run(o.id, o.customer, o.product, o.price, o.status, o.created_at);
+  for (const o of orders) insertOrder.run(o.id, o.customer, o.product, o.price, o.status, o.channel, o.created_at);
 
   console.log(`Seeded DB (${todayLabel()}): ${products.length} products, ${customers.length} customers, ${orders.length} orders`);
 }
@@ -187,5 +188,41 @@ function backfillOrderDates() {
 }
 
 backfillOrderDates();
+
+// One-time migration for databases created before the sales-channel field existed:
+// add the column and spread channels across the 8 original seed orders,
+// but only if they are still untouched (all still on the 'Direct' default).
+function migrateOrderChannels() {
+  try {
+    const cols = db.prepare("PRAGMA table_info(orders)").all();
+    if (!cols.some((c) => c.name === "channel")) {
+      db.exec("ALTER TABLE orders ADD COLUMN channel TEXT NOT NULL DEFAULT 'Direct'");
+    }
+    const SPREAD = {
+      "#ORD-101": "Direct",
+      "#ORD-102": "Organic Search",
+      "#ORD-103": "Direct",
+      "#ORD-104": "Social Media",
+      "#ORD-105": "Organic Search",
+      "#ORD-106": "Paid Ads",
+      "#ORD-107": "Referral",
+      "#ORD-108": "Direct",
+    };
+    const SEED_IDS = Object.keys(SPREAD);
+    const placeholders = SEED_IDS.map(() => "?").join(",");
+    const rows = db
+      .prepare(`SELECT id, channel FROM orders WHERE id IN (${placeholders})`)
+      .all(...SEED_IDS);
+    if (rows.length !== SEED_IDS.length) return;
+    if (!rows.every((r) => r.channel === "Direct")) return;
+    const update = db.prepare("UPDATE orders SET channel = ? WHERE id = ?");
+    for (const id of SEED_IDS) update.run(SPREAD[id], id);
+    console.log("Backfilled seed order sales channels");
+  } catch {
+    // nothing to migrate
+  }
+}
+
+migrateOrderChannels();
 
 export default db;

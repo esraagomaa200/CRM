@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ordersApi, customersApi } from '../lib/api';
 
 const FILTERS = ['All', 'Processing', 'Delivered', 'Cancelled'];
+const CHANNELS = ['Direct', 'Organic Search', 'Social Media', 'Paid Ads', 'Referral'];
 
 const STATUS_BADGE = {
     Processing: 'bg-amber-100 text-amber-700',
@@ -28,6 +29,7 @@ export default function Orders() {
     const [newProduct, setNewProduct] = useState('');
     const [newPrice, setNewPrice] = useState('');
     const [newStatus, setNewStatus] = useState('Processing');
+    const [newChannel, setNewChannel] = useState('Direct');
 
     useEffect(() => {
         let cancelled = false;
@@ -79,6 +81,7 @@ export default function Orders() {
                 product: newProduct,
                 price: Number(newPrice) || 0,
                 status: newStatus,
+                channel: newChannel,
             });
             setOrders((prev) => [created, ...prev]);
 
@@ -86,6 +89,7 @@ export default function Orders() {
             setNewProduct('');
             setNewPrice('');
             setNewStatus('Processing');
+            setNewChannel('Direct');
             setShowAddModal(false);
         } catch (err) {
             alert(err.message || 'Failed to add order');
@@ -343,6 +347,20 @@ export default function Orders() {
                                         <option value="Processing">Processing</option>
                                         <option value="Delivered">Delivered</option>
                                         <option value="Cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold uppercase tracking-wide text-gray-500 mb-1.5">
+                                        Sales Channel
+                                    </label>
+                                    <select
+                                        value={newChannel}
+                                        onChange={(e) => setNewChannel(e.target.value)}
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-[10px] px-4 py-3 text-sm text-gray-900 outline-none"
+                                    >
+                                        {CHANNELS.map((c) => (
+                                            <option key={c} value={c}>{c}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>
