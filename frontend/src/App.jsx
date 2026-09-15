@@ -5,16 +5,9 @@ import Dashboard from "./components/Dashboard";
 import Customers from "./pages/Customers";
 import Products from "./pages/Products";
 import Orders from "./pages/Orders";
+import Analytics from "./pages/Analytics";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
-
-function Placeholder({ title }) {
-  return (
-    <div>
-      <h1 className="text-2xl font-bold mb-2">{title}</h1>
-    </div>
-  );
-}
 
 function App() {
   return (
@@ -33,7 +26,7 @@ function App() {
         <Route path="/products" element={<Products />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/customers" element={<Customers />} />
-        <Route path="/analytics" element={<Placeholder title="Analytics" />} />
+        <Route path="/analytics" element={<Analytics />} />
         <Route path="*" element={<Navigate to="/customers" replace />} />
       </Route>
     </Routes>

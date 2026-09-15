@@ -12,6 +12,7 @@ app.use(express.json());
 
 // ---------- helpers ----------
 const ORDER_STATUSES = ["Processing", "Delivered", "Cancelled"];
+const ORDER_CHANNELS = ["Direct", "Organic Search", "Social Media", "Paid Ads", "Referral"];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function publicUser(row) {
@@ -210,6 +211,132 @@ app.get("/api/dashboard", (req, res) => {
   });
 });
 
+// ---------- analytics (one call for the whole Analytics page) ----------
+// Every figure is computed from the same products/customers/orders tables,
+// so it always matches the Dashboard, Products, Customers and Orders pages.
+app.get("/api/analytics", (req, res) => {
+  const totalRevenue =
+    db.prepare("SELECT COALESCE(SUM(price), 0) AS total FROM orders WHERE status != 'Cancelled'").get()
+      .total;
+  const totalOrders = db.prepare("SELECT COUNT(*) AS n FROM orders").get().n;
+  const deliveredOrders = db.prepare("SELECT COUNT(*) AS n FROM orders WHERE status = 'Delivered'").get().n;
+  const avgOrderValue = totalOrders > 0 ? Math.round((totalRevenue / totalOrders) * 100) / 100 : 0;
+  const deliveredRate = totalOrders > 0 ? Math.round((deliveredOrders / totalOrders) * 1000) / 10 : 0;
+
+  // Monthly revenue (non-cancelled), last 12 months ending at the latest order month
+  const monthly = db
+    .prepare(
+      `SELECT substr(created_at, 1, 7) AS ym, SUM(price) AS total, COUNT(*) AS orders FROM orders
+       WHERE status != 'Cancelled' GROUP BY ym ORDER BY ym`
+    )
+    .all();
+  const latest = monthly.length ? monthly[monthly.length - 1].ym : new Date().toISOString().slice(0, 7);
+  const [endY, endM] = latest.split("-").map(Number);
+  const totalsByYm = Object.fromEntries(monthly.map((m) => [m.ym, m.total]));
+  const ordersByYm = Object.fromEntries(monthly.map((m) => [m.ym, m.orders]));
+  const revenueByMonth = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date(endY, endM - 1 - i, 1);
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    revenueByMonth.push({
+      ym,
+      year: d.getFullYear(),
+      month: MONTH_LABELS[d.getMonth()],
+      value: totalsByYm[ym] || 0,
+      orders: ordersByYm[ym] || 0,
+    });
+  }
+
+  // Prior-period deltas: recent 6 months vs the 6 before them
+  const pctChange = (recent, prior) =>
+    prior > 0 ? +(((recent - prior) / prior) * 100).toFixed(1) : null;
+  const recentRev = revenueByMonth.slice(6).reduce((s, m) => s + m.value, 0);
+  const priorRev = revenueByMonth.slice(0, 6).reduce((s, m) => s + m.value, 0);
+  const recentOrd = revenueByMonth.slice(6).reduce((s, m) => s + m.orders, 0);
+  const priorOrd = revenueByMonth.slice(0, 6).reduce((s, m) => s + m.orders, 0);
+  const recentAvg = recentOrd > 0 ? recentRev / recentOrd : 0;
+  const priorAvg = priorOrd > 0 ? priorRev / priorOrd : 0;
+  const deltas = {
+    revenue: pctChange(recentRev, priorRev),
+    orders: pctChange(recentOrd, priorOrd),
+    avg: pctChange(recentAvg, priorAvg),
+  };
+
+  // Orders + revenue per day, last 7 days ending at the latest order day
+  const latestDayRow = db
+    .prepare("SELECT substr(MAX(created_at), 1, 10) AS day FROM orders")
+    .get();
+  const anchorDay = latestDayRow?.day || new Date().toISOString().slice(0, 10);
+  const dailyRows = db
+    .prepare(
+      `SELECT substr(created_at, 1, 10) AS day, COUNT(*) AS orders,
+              COALESCE(SUM(CASE WHEN status != 'Cancelled' THEN price ELSE 0 END), 0) AS revenue
+       FROM orders WHERE date(created_at) > date(?, '-7 days') AND date(created_at) <= date(?)
+       GROUP BY day`
+    )
+    .all(anchorDay, anchorDay);
+  const dailyByDay = Object.fromEntries(dailyRows.map((r) => [r.day, r]));
+  const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const ordersByDay = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(`${anchorDay}T12:00:00`);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    ordersByDay.push({
+      day: WEEKDAYS[d.getDay()],
+      orders: dailyByDay[key]?.orders || 0,
+      revenue: dailyByDay[key]?.revenue || 0,
+    });
+  }
+
+  // Sales channels share (live from the orders table)
+  const channelRows = db
+    .prepare("SELECT COALESCE(channel, 'Direct') AS name, COUNT(*) AS value FROM orders GROUP BY name ORDER BY value DESC")
+    .all();
+  const channelTotal = channelRows.reduce((s, r) => s + r.value, 0) || 1;
+  const salesChannels = channelRows.map((r) => ({
+    ...r,
+    pct: Math.round((r.value / channelTotal) * 100),
+  }));
+
+  const ordersByStatus = db
+    .prepare("SELECT status AS name, COUNT(*) AS value FROM orders GROUP BY status")
+    .all();
+
+  // Revenue + units per product category (orders joined to products by product name)
+  const revenueByCategory = db
+    .prepare(
+      `SELECT p.category AS name, SUM(o.price) AS revenue, COUNT(*) AS units
+       FROM orders o JOIN products p ON p.name = o.product
+       WHERE o.status != 'Cancelled'
+       GROUP BY p.category ORDER BY revenue DESC`
+    )
+    .all();
+
+  const customersBySegment = db
+    .prepare("SELECT segment AS name, COUNT(*) AS value FROM customers GROUP BY segment ORDER BY value DESC")
+    .all();
+
+  const topCustomers = db
+    .prepare("SELECT * FROM customers")
+    .all()
+    .map(toCustomer)
+    .sort((a, b) => b.ltv - a.ltv)
+    .slice(0, 5);
+
+  res.json({
+    kpis: { totalRevenue, totalOrders, avgOrderValue, deliveredRate },
+    deltas,
+    revenueByMonth,
+    ordersByDay,
+    salesChannels,
+    ordersByStatus,
+    revenueByCategory,
+    customersBySegment,
+    topCustomers,
+  });
+});
+
 // ---------- products ----------
 app.get("/api/products", (req, res) => {
   let rows = db
@@ -382,20 +509,24 @@ function generateOrderId() {
 }
 
 app.post("/api/orders", (req, res) => {
-  const { customer, product, price, status } = req.body || {};
+  const { customer, product, price, status, channel } = req.body || {};
   if (!customer?.trim() || !product?.trim()) {
     return res.status(400).json({ message: "customer and product are required" });
   }
   if (status && !ORDER_STATUSES.includes(status)) {
     return res.status(400).json({ message: "Invalid status" });
   }
+  if (channel && !ORDER_CHANNELS.includes(channel)) {
+    return res.status(400).json({ message: "Invalid channel" });
+  }
   const id = generateOrderId();
-  db.prepare("INSERT INTO orders (id, customer, product, price, status) VALUES (?, ?, ?, ?, ?)").run(
+  db.prepare("INSERT INTO orders (id, customer, product, price, status, channel) VALUES (?, ?, ?, ?, ?, ?)").run(
     id,
     customer.trim(),
     product.trim(),
     Number(price) || 0,
-    status || "Processing"
+    status || "Processing",
+    channel || "Direct"
   );
   res.status(201).json(db.prepare("SELECT * FROM orders WHERE id = ?").get(id));
 });
@@ -403,15 +534,19 @@ app.post("/api/orders", (req, res) => {
 function updateOrder(req, res) {
   const existing = db.prepare("SELECT * FROM orders WHERE id = ?").get(req.params.id);
   if (!existing) return res.status(404).json({ message: "Order not found" });
-  const { customer, product, price, status } = req.body || {};
+  const { customer, product, price, status, channel } = req.body || {};
   if (status && !ORDER_STATUSES.includes(status)) {
     return res.status(400).json({ message: "Invalid status" });
   }
-  db.prepare("UPDATE orders SET customer = ?, product = ?, price = ?, status = ? WHERE id = ?").run(
+  if (channel && !ORDER_CHANNELS.includes(channel)) {
+    return res.status(400).json({ message: "Invalid channel" });
+  }
+  db.prepare("UPDATE orders SET customer = ?, product = ?, price = ?, status = ?, channel = ? WHERE id = ?").run(
     customer ?? existing.customer,
     product ?? existing.product,
     price !== undefined ? Number(price) || 0 : existing.price,
     status ?? existing.status,
+    channel ?? existing.channel ?? "Direct",
     req.params.id
   );
   res.json(db.prepare("SELECT * FROM orders WHERE id = ?").get(req.params.id));
