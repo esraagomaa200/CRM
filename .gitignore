@@ -16,6 +16,7 @@ dist-ssr
 *.db
 *.db-wal
 *.db-shm
+*.pdf
 
 # Editor directories and files
 .vscode/*
