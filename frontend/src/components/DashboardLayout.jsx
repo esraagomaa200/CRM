@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import ChatWidget from "./ChatWidget";
 
 export default function DashboardLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -15,6 +16,7 @@ export default function DashboardLayout() {
           <Outlet />
         </div>
       </div>
+      <ChatWidget />
     </div>
   );
 }

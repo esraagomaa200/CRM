@@ -69,3 +69,8 @@ export const authApi = {
     request("/auth/me", { method: "PUT", body: JSON.stringify(payload) }, token),
   logout: (token) => request("/auth/logout", { method: "POST" }, token),
 };
+
+export const chatApi = {
+  ask: (message, history) =>
+    request("/chat", { method: "POST", body: JSON.stringify({ message, history }) }),
+};

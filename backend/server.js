@@ -3,6 +3,7 @@ import cors from "cors";
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
 import db from "./db.js";
+import { registerChatRoutes } from "./chat.js";
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -586,6 +587,9 @@ app.delete("/api/orders/:id", (req, res) => {
   if (result.changes === 0) return res.status(404).json({ message: "Order not found" });
   res.json({ ok: true });
 });
+
+// ---------- AI assistant (Gemini, live DB context) ----------
+registerChatRoutes(app, db);
 
 // ---------- errors ----------
 app.use((req, res) => res.status(404).json({ message: "Not found" }));
