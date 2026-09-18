@@ -13,6 +13,7 @@ dist-ssr
 .vite
 *.local
 .env
+.env.gemini
 *.db
 *.db-wal
 *.db-shm
